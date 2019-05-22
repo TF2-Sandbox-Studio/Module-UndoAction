@@ -3,7 +3,7 @@
 #define DEBUG
 
 #define PLUGIN_AUTHOR "BattlefieldDuck"
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 
 #include <sourcemod>
 #include <sdkhooks>
@@ -29,7 +29,7 @@ public void OnPluginStart()
 {
 	RegAdminCmd("sm_undo", Command_UndoAction, 0, "Reverses the last action");
 	
-	for (int client = 1; client < MaxClients; client++)
+	for (int client = 1; client <= MaxClients; client++)
 		if(IsClientInGame(client))
 			OnClientPutInServer(client);
 }
@@ -46,7 +46,10 @@ public void OnClientPutInServer(int client)
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	RequestFrame(GetEntityOwner, EntIndexToEntRef(entity));
+	if (StrContains(classname, "prop_") != -1)
+	{
+		RequestFrame(GetEntityOwner, EntIndexToEntRef(entity));
+	}
 }
 
 public void GetEntityOwner(int entityref)
@@ -70,21 +73,28 @@ public Action Command_UndoAction(int client, int args)
 	if (client > 0 && client <= MaxClients && IsClientInGame(client))
 	{
 		int entity = INVALID_ENT_REFERENCE;
-		while (g_iIndex[client] > 0 && !IsValidEntity(entity))
+		while (g_iIndex[client] > 0)
 		{
 			g_iIndex[client]--;
 			entity = EntRefToEntIndex(g_iSpawnedEntityRef[client][g_iIndex[client]]);
+			g_iSpawnedEntityRef[client][g_iIndex[client]] = INVALID_ENT_REFERENCE;
+			
+			if (entity != INVALID_ENT_REFERENCE)
+			{
+				break;
+			}
 		}
 
-		if (IsValidEntity(entity))
+		if (entity != INVALID_ENT_REFERENCE)
 		{
 			char strName[128];
 			GetEntPropString(entity, Prop_Data, "m_iName", strName, sizeof(strName));
-			
-			AcceptEntityInput(entity, "Kill");
-			
+
 			Format(strName, sizeof(strName), "Undone Prop (%s)", strName);
 			Build_PrintToChat(client, strName);
+			
+			AcceptEntityInput(entity, "Kill");
+			Build_SetLimit(client, -1);
 		}
 	}
 }
